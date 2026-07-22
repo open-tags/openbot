@@ -1,0 +1,7 @@
+{
+	"nodes":[
+		{"id":"24a8b7e20aab902f","type":"file","file":"docs/images/motor-layout-1.png","x":-420,"y":-120,"width":224,"height":144},
+		{"id":"47bc93913ab2b278","type":"file","file":"docs/images/motor-layout-3.png","x":-80,"y":-220,"width":794,"height":283}
+	],
+	"edges":[]
+}

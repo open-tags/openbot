@@ -1,0 +1,23 @@
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
+*~
+
+# PlatformIO
+.pio/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local configuration and output
+.env
+.env.*
+!.env.example
+*.log
+build/
+dist/
+node_modules/

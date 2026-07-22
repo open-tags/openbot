@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BNO085 3D Viewer</title>
+<style>
+  html,body{margin:0;height:100%;background:#0e0f13;color:#e6e6e6;font:14px/1.4 system-ui,sans-serif;overflow:hidden}
+  #ui{position:fixed;top:12px;left:12px;z-index:10}
+  button{background:#2b6cff;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  #status{margin-top:8px;padding:6px 10px;background:#1b1d24;border-radius:6px;display:inline-block}
+  #hud{position:fixed;bottom:12px;left:12px;font-variant-numeric:tabular-nums;color:#8aa;white-space:pre}
+</style>
+</head>
+<body>
+<div id="ui">
+  <button id="connect">Connect to XIAO</button>
+  <div id="status">Not connected</div>
+</div>
+<div id="hud"></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+// ---- scene ----
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0, 0, 6);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x223, 1.1));
+const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+dir.position.set(3, 5, 4); scene.add(dir);
+
+// a flat rectangle "board" so orientation is obvious
+const geo = new THREE.BoxGeometry(3, 0.4, 2);
+const mats = [
+  new THREE.MeshStandardMaterial({color:0xff4d4d}), // +x
+  new THREE.MeshStandardMaterial({color:0x8b1a1a}), // -x
+  new THREE.MeshStandardMaterial({color:0x4dff88}), // +y (top)
+  new THREE.MeshStandardMaterial({color:0x1a7a3a}), // -y (bottom)
+  new THREE.MeshStandardMaterial({color:0x4d8bff}), // +z
+  new THREE.MeshStandardMaterial({color:0x1a3a7a}), // -z
+];
+const box = new THREE.Mesh(geo, mats);
+scene.add(box);
+
+scene.add(new THREE.AxesHelper(2.5));
+const grid = new THREE.GridHelper(12, 12, 0x334, 0x223);
+grid.position.y = -2; scene.add(grid);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// target quaternion updated from serial; box eases toward it
+const target = new THREE.Quaternion();
+const qOffset = new THREE.Quaternion(); // "zero" so current pose becomes identity
+let latest = null;
+
+function animate(){
+  requestAnimationFrame(animate);
+  box.quaternion.slerp(target, 0.35);   // smoothing
+  renderer.render(scene, camera);
+}
+animate();
+
+// ---- Web Serial ----
+const statusEl = document.getElementById('status');
+const hud = document.getElementById('hud');
+const btn = document.getElementById('connect');
+
+function setStatus(t){ statusEl.textContent = t; }
+
+btn.addEventListener('click', async () => {
+  if (!('serial' in navigator)) { setStatus('Web Serial not supported — use Chrome/Edge'); return; }
+  try {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    setStatus('Connected — reading…');
+    btn.disabled = true;
+    readLoop(port);
+  } catch (e) { setStatus('Connect failed: ' + e.message); }
+});
+
+async function readLoop(port){
+  const decoder = new TextDecoderStream();
+  port.readable.pipeTo(decoder.writable);
+  const reader = decoder.readable.getReader();
+  let buf = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += value;
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      handleLine(line);
+    }
+  }
+}
+
+// Map BNO085 quaternion -> three.js. BNO reports (i,j,k,real).
+// three.js Quaternion(x,y,z,w). We also rotate so the board lies flat.
+const fix = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0));
+
+function handleLine(line){
+  if (!line.startsWith('Q,')) { if(line) setStatus(line); return; }
+  const p = line.split(',');
+  if (p.length !== 5) return;
+  const i = +p[1], j = +p[2], k = +p[3], r = +p[4];
+  const q = new THREE.Quaternion(i, j, k, r);
+  // apply zero-offset then the flat-fix
+  const adjusted = qOffset.clone().invert().multiply(q);
+  target.copy(fix).multiply(adjusted);
+  hud.textContent =
+    `q = [${i.toFixed(3)}, ${j.toFixed(3)}, ${k.toFixed(3)}, ${r.toFixed(3)}]\n` +
+    `press Z to zero orientation`;
+  window._lastQ = q;
+}
+
+// press Z to make the current physical pose the "flat/zero" pose
+addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'z' && window._lastQ) qOffset.copy(window._lastQ);
+});
+</script>
+</body>
+</html>
