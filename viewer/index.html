@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Interactive 3D viewer for the OpenBot assembly.">
-    <title>OpenBot 3D Viewer</title>
+    <meta name="description" content="interactive 3d viewer for the openbot assembly.">
+    <title>openbot 3d viewer</title>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.3.1/model-viewer.min.js"></script>
     <style>
       :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
@@ -33,7 +33,7 @@
         font-size: .82rem;
         font-weight: 650;
         letter-spacing: .16em;
-        text-transform: uppercase;
+        text-transform: lowercase;
       }
       nav { display: flex; align-items: center; gap: .65rem; pointer-events: auto; }
       a, button {
@@ -83,10 +83,10 @@
   </head>
   <body>
     <header>
-      <h1>OpenBot</h1>
-      <nav aria-label="Viewer controls">
-        <button id="reset" type="button">Reset view</button>
-        <a href="https://cad.onshape.com/documents/432dec42a257744f3b8f22d9/w/829cba9d7a4b997211a6277e/e/69cb96d6d8647e33e3457e0e">Open CAD</a>
+      <h1>openbot</h1>
+      <nav aria-label="viewer controls">
+        <button id="reset" type="button">reset view</button>
+        <a href="https://cad.onshape.com/documents/432dec42a257744f3b8f22d9/w/829cba9d7a4b997211a6277e/e/69cb96d6d8647e33e3457e0e">open cad</a>
       </nav>
     </header>
 
@@ -94,8 +94,8 @@
       id="openbot"
       src="../cad/openbot_assembly.gltf"
       poster="../cad/openbot-top.png"
-      environment-image="studio-environment.jpg"
-      alt="Interactive 3D model of the OpenBot assembly"
+      environment-image="neutral"
+      alt="interactive 3d model of the openbot assembly"
       orientation="0deg 0deg 90deg"
       camera-orbit="45deg 68deg 105%"
       field-of-view="28deg"
@@ -104,11 +104,8 @@
       camera-controls
       disable-pan
       touch-action="pan-y"
-      auto-rotate
-      auto-rotate-delay="2500"
-      rotation-per-second="6deg"
       tone-mapping="neutral"
-      exposure="0.82"
+      exposure="1"
       shadow-intensity="1"
       shadow-softness="0.72"
       interaction-prompt="auto">
@@ -117,7 +114,7 @@
       </div>
     </model-viewer>
 
-    <p class="hint">Drag to orbit · Scroll to zoom</p>
+    <p class="hint">drag to orbit · scroll to zoom</p>
 
     <script type="module">
       const viewer = document.querySelector('#openbot');
@@ -126,7 +123,7 @@
 
       const finish = {
         shell: { color: '#1b1d20', metal: 0.03, rough: 0.38 },
-        tag: { color: '#24262a', metal: 0.02, rough: 0.32 },
+        glass: { color: [0.7, 0.82, 0.9, 0.2], metal: 0, rough: 0.1 },
         roller: { color: '#ad9148', metal: 0.08, rough: 0.42 },
         steel: { metal: 0.82, rough: 0.24 },
         brass: { metal: 0.72, rough: 0.27 },
@@ -144,7 +141,7 @@
           let recipe = finish.plastic;
 
           if ([0, 1, 7].includes(index)) recipe = finish.shell;
-          if (index === 30) recipe = finish.tag;
+          if (index === 30) recipe = finish.glass;
           if (index === 8) recipe = finish.roller;
           if (steel.has(index)) recipe = finish.steel;
           if (brass.has(index)) recipe = finish.brass;
@@ -154,9 +151,14 @@
           pbr.setMetallicFactor(recipe.metal);
           pbr.setRoughnessFactor(recipe.rough);
 
+          if (index === 30) {
+            material.setAlphaMode('BLEND');
+            material.setDoubleSided(true);
+          }
+
           if ([0, 1, 7, 30].includes(index) && material.setClearcoatFactor) {
             material.setClearcoatFactor(0.18);
-            material.setClearcoatRoughnessFactor(0.46);
+            material.setClearcoatRoughnessFactor(index === 30 ? 0.1 : 0.46);
           }
         });
       });
