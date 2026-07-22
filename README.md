@@ -4,6 +4,10 @@ openbot is the mobile robot prototype for [opentag one](https://open-tags.com/on
 
 ![openbot assembly](cad/openbot-top.png)
 
+## system-level design
+
+![openbot system-level design](docs/images/system-level-design.png)
+
 - [cad (onshape)](https://cad.onshape.com/documents/432dec42a257744f3b8f22d9/w/829cba9d7a4b997211a6277e/e/69cb96d6d8647e33e3457e0e)
 - [step assembly](cad/openbot_assembly.step)
 - `firmware/control/` — main xiao esp32-s3 firmware
