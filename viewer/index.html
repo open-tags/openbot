@@ -5,50 +5,173 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Interactive 3D viewer for the OpenBot assembly.">
     <title>OpenBot 3D Viewer</title>
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.1.0/model-viewer.min.js"></script>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.3.1/model-viewer.min.js"></script>
     <style>
-      :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       * { box-sizing: border-box; }
       html, body { height: 100%; margin: 0; }
-      body { background: #080808; color: #f5f5f5; }
+      body {
+        overflow: hidden;
+        color: #f4f1e8;
+        background:
+          radial-gradient(circle at 52% 42%, #25272a 0, #111214 42%, #050506 78%);
+      }
       header {
         position: fixed;
-        z-index: 1;
+        z-index: 2;
         inset: 0 0 auto 0;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        padding: 1rem 1.25rem;
-        background: linear-gradient(#080808e8, transparent);
+        padding: 1.15rem 1.35rem;
+        background: linear-gradient(#060607dd, transparent);
+        pointer-events: none;
       }
-      h1 { margin: 0; font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; }
-      a { color: #d9bd67; }
-      model-viewer { width: 100%; height: 100%; --poster-color: #080808; }
+      h1 {
+        margin: 0;
+        font-size: .82rem;
+        font-weight: 650;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+      }
+      nav { display: flex; align-items: center; gap: .65rem; pointer-events: auto; }
+      a, button {
+        border: 1px solid #ffffff24;
+        border-radius: 999px;
+        padding: .55rem .8rem;
+        color: #eee9db;
+        background: #161719b8;
+        font: inherit;
+        font-size: .78rem;
+        text-decoration: none;
+        backdrop-filter: blur(12px);
+        cursor: pointer;
+      }
+      a:hover, button:hover { border-color: #c5a95c; color: #e7cc7d; }
+      model-viewer {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        --poster-color: transparent;
+        --progress-bar-color: #c3a553;
+      }
+      .progress-track {
+        position: absolute;
+        inset: auto 12% 1.6rem;
+        height: 2px;
+        overflow: hidden;
+        background: #ffffff1c;
+        transition: opacity .3s ease;
+      }
+      .progress-fill { width: 0; height: 100%; background: #d1b760; }
       .hint {
         position: fixed;
-        inset: auto 1rem 1rem auto;
+        z-index: 2;
+        inset: auto 1.25rem 1.1rem auto;
         margin: 0;
-        color: #aaa;
-        font-size: .8rem;
+        color: #918f88;
+        font-size: .72rem;
+        letter-spacing: .03em;
+        pointer-events: none;
+      }
+      @media (max-width: 520px) {
+        header { padding: .9rem; }
+        .hint { right: .9rem; bottom: .8rem; }
       }
     </style>
   </head>
   <body>
     <header>
       <h1>OpenBot</h1>
-      <a href="https://cad.onshape.com/documents/432dec42a257744f3b8f22d9/w/829cba9d7a4b997211a6277e/e/69cb96d6d8647e33e3457e0e">Open CAD</a>
+      <nav aria-label="Viewer controls">
+        <button id="reset" type="button">Reset view</button>
+        <a href="https://cad.onshape.com/documents/432dec42a257744f3b8f22d9/w/829cba9d7a4b997211a6277e/e/69cb96d6d8647e33e3457e0e">Open CAD</a>
+      </nav>
     </header>
+
     <model-viewer
+      id="openbot"
       src="../cad/openbot_assembly.gltf"
       poster="../cad/openbot-top.png"
+      environment-image="studio-environment.jpg"
       alt="Interactive 3D model of the OpenBot assembly"
+      orientation="0deg 0deg 90deg"
+      camera-orbit="45deg 68deg 105%"
+      field-of-view="28deg"
+      min-field-of-view="18deg"
+      max-field-of-view="45deg"
       camera-controls
+      disable-pan
+      touch-action="pan-y"
       auto-rotate
+      auto-rotate-delay="2500"
+      rotation-per-second="6deg"
+      tone-mapping="neutral"
+      exposure="0.82"
       shadow-intensity="1"
-      exposure="1.1"
+      shadow-softness="0.72"
       interaction-prompt="auto">
+      <div class="progress-track" slot="progress-bar" aria-hidden="true">
+        <div class="progress-fill"></div>
+      </div>
     </model-viewer>
+
     <p class="hint">Drag to orbit · Scroll to zoom</p>
+
+    <script type="module">
+      const viewer = document.querySelector('#openbot');
+      const progressTrack = document.querySelector('.progress-track');
+      const progressFill = document.querySelector('.progress-fill');
+
+      const finish = {
+        shell: { color: '#1b1d20', metal: 0.03, rough: 0.38 },
+        tag: { color: '#24262a', metal: 0.02, rough: 0.32 },
+        roller: { color: '#ad9148', metal: 0.08, rough: 0.42 },
+        steel: { metal: 0.82, rough: 0.24 },
+        brass: { metal: 0.72, rough: 0.27 },
+        board: { metal: 0.02, rough: 0.48 },
+        plastic: { metal: 0.02, rough: 0.5 }
+      };
+
+      const steel = new Set([2, 5, 6, 11, 18, 19, 20, 22, 25, 27, 28, 31]);
+      const brass = new Set([9, 23, 24]);
+      const boards = new Set([3, 4, 21]);
+
+      viewer.addEventListener('load', () => {
+        viewer.model.materials.forEach((material, index) => {
+          const pbr = material.pbrMetallicRoughness;
+          let recipe = finish.plastic;
+
+          if ([0, 1, 7].includes(index)) recipe = finish.shell;
+          if (index === 30) recipe = finish.tag;
+          if (index === 8) recipe = finish.roller;
+          if (steel.has(index)) recipe = finish.steel;
+          if (brass.has(index)) recipe = finish.brass;
+          if (boards.has(index)) recipe = finish.board;
+
+          if (recipe.color) pbr.setBaseColorFactor(recipe.color);
+          pbr.setMetallicFactor(recipe.metal);
+          pbr.setRoughnessFactor(recipe.rough);
+
+          if ([0, 1, 7, 30].includes(index) && material.setClearcoatFactor) {
+            material.setClearcoatFactor(0.18);
+            material.setClearcoatRoughnessFactor(0.46);
+          }
+        });
+      });
+
+      viewer.addEventListener('progress', (event) => {
+        const progress = event.detail.totalProgress;
+        progressFill.style.width = `${progress * 100}%`;
+        progressTrack.style.opacity = progress === 1 ? '0' : '1';
+      });
+
+      document.querySelector('#reset').addEventListener('click', () => {
+        viewer.cameraOrbit = '45deg 68deg 105%';
+        viewer.fieldOfView = '28deg';
+        viewer.jumpCameraToGoal();
+      });
+    </script>
   </body>
 </html>
